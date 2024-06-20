@@ -27,6 +27,7 @@ import java.io.EOFException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
+import java.nio.channels.AsynchronousCloseException;
 import java.util.Queue;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -96,6 +97,7 @@ class RequestErrorTracker
     public void requestFailed(Throwable reason)
             throws TrinoException
     {
+        System.out.println("[WENDIGO] Request failed: " + reason);
         // cancellation is not a failure
         if (reason instanceof CancellationException) {
             return;
@@ -154,6 +156,7 @@ class RequestErrorTracker
                     (t instanceof SocketTimeoutException) ||
                     (t instanceof EOFException) ||
                     (t instanceof TimeoutException) ||
+                    (t instanceof AsynchronousCloseException) ||
                     (t instanceof ServiceUnavailableException)) {
                 return true;
             }

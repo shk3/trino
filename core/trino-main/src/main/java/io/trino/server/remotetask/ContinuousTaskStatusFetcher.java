@@ -13,6 +13,7 @@
  */
 package io.trino.server.remotetask;
 
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.errorprone.annotations.concurrent.GuardedBy;
@@ -30,6 +31,7 @@ import io.trino.execution.TaskStatus;
 import io.trino.spi.HostAddress;
 import io.trino.spi.TrinoException;
 
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -155,7 +157,25 @@ class ContinuousTaskStatusFetcher
 
         errorTracker.startRequest();
         future = httpClient.executeAsync(request, createFullJsonResponseHandler(taskStatusCodec));
-        Futures.addCallback(future, new SimpleHttpResponseHandler<>(new TaskStatusResponseCallback(), request.getUri(), stats), executor);
+        SimpleHttpResponseHandler<TaskStatus> taskResponseHandler = new SimpleHttpResponseHandler<>(new TaskStatusResponseCallback(), request.getUri(), stats);
+        Futures.addCallback(future, new FutureCallback<>() {
+            @Override
+            public void onSuccess(FullJsonResponseHandler.JsonResponse<TaskStatus> result)
+            {
+                taskResponseHandler.onSuccess(result);
+            }
+
+            @Override
+            public void onFailure(Throwable throwable)
+            {
+                if (throwable instanceof CancellationException) {
+                    return;
+                }
+
+                System.out.println("[WENDIGO] onFailure " + throwable);
+                taskResponseHandler.onFailure(throwable);
+            }
+        }, executor);
     }
 
     TaskStatus getTaskStatus()
@@ -171,6 +191,9 @@ class ContinuousTaskStatusFetcher
         @Override
         public void success(TaskStatus value)
         {
+            if (!running) {
+                return;
+            }
             try (SetThreadName _ = new SetThreadName("ContinuousTaskStatusFetcher-%s", taskId)) {
                 updateStats(requestStartNanos);
                 updateTaskStatus(value);
@@ -185,6 +208,9 @@ class ContinuousTaskStatusFetcher
         @Override
         public void failed(Throwable cause)
         {
+            if (!running) {
+                return;
+            }
             try (SetThreadName _ = new SetThreadName("ContinuousTaskStatusFetcher-%s", taskId)) {
                 updateStats(requestStartNanos);
                 // if task not already done, record error
