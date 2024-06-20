@@ -15,6 +15,7 @@ package io.trino.server;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.jaxrs.AsyncResponseHandler;
+import io.airlift.log.Logger;
 import jakarta.servlet.AsyncContext;
 import jakarta.servlet.AsyncEvent;
 import jakarta.servlet.AsyncListener;
@@ -40,8 +41,10 @@ import static java.util.Objects.requireNonNull;
 public class DisconnectionAwareAsyncResponse
         implements AsyncResponse
 {
+    private static final Logger log = Logger.get(DisconnectionAwareAsyncResponse.class);
+
     // Guards against calling AsyncResponse methods when client is no longer interested in consuming a response
-    private final AtomicBoolean clientDisconnected = new AtomicBoolean();
+    private final AtomicBoolean terminated = new AtomicBoolean();
 
     private final AsyncContext asyncContext;
     private final AsyncResponse delegate;
@@ -62,19 +65,18 @@ public class DisconnectionAwareAsyncResponse
             public void onComplete(AsyncEvent event) {}
 
             @Override
-            public void onTimeout(AsyncEvent event) {}
+            public void onTimeout(AsyncEvent event)
+            {
+                log.info("async request timed out context:" + event.getAsyncContext());
+                terminate();
+            }
 
             @Override
             public void onError(AsyncEvent event)
             {
+                log.info("async request errored context:" + event.getAsyncContext() + " error: " + event.getThrowable());
                 if (wasRequestTerminated(event.getThrowable())) {
-                    if (clientDisconnected.compareAndSet(false, true)) {
-                        asyncContext.complete();
-                        ListenableFuture<?> future = cancellableFuture.getAndSet(null);
-                        if (future != null) {
-                            future.cancel(true);
-                        }
-                    }
+                    terminate();
                 }
             }
 
@@ -89,49 +91,78 @@ public class DisconnectionAwareAsyncResponse
         return this;
     }
 
+    private void terminate()
+    {
+        if (terminated.compareAndSet(false, true)) {
+            asyncContext.complete();
+            ListenableFuture<?> future = cancellableFuture.getAndSet(null);
+            if (future != null) {
+                future.cancel(true);
+            }
+        }
+    }
+
     @Override
     public boolean resume(Object response)
     {
-        if (clientDisconnected.get()) {
+        if (wasTerminated()) {
             return true;
         }
-        return delegate.resume(response);
+
+        if (terminated.compareAndSet(false, true)) {
+            return delegate.resume(response);
+        }
+
+        return true;
     }
 
     @Override
     public boolean resume(Throwable response)
     {
-        if (clientDisconnected.get()) {
+        if (wasTerminated()) {
             return true;
         }
-        return delegate.resume(response);
+        if (terminated.compareAndSet(false, true)) {
+            return delegate.resume(response);
+        }
+        return true;
     }
 
     @Override
     public boolean cancel()
     {
-        if (clientDisconnected.get()) {
+        if (wasTerminated()) {
             return true;
         }
-        return delegate.cancel();
+
+        if (terminated.compareAndSet(false, true)) {
+            return delegate.cancel();
+        }
+        return true;
     }
 
     @Override
     public boolean cancel(int retryAfter)
     {
-        if (clientDisconnected.get()) {
+        if (wasTerminated()) {
             return true;
         }
-        return delegate.cancel(retryAfter);
+        if (terminated.compareAndSet(false, true)) {
+            return delegate.cancel(retryAfter);
+        }
+        return true;
     }
 
     @Override
     public boolean cancel(Date retryAfter)
     {
-        if (clientDisconnected.get()) {
+        if (wasTerminated()) {
             return true;
         }
-        return delegate.cancel(retryAfter);
+        if (terminated.compareAndSet(false, true)) {
+            return delegate.cancel(retryAfter);
+        }
+        return true;
     }
 
     @Override
@@ -149,7 +180,7 @@ public class DisconnectionAwareAsyncResponse
     @Override
     public boolean isDone()
     {
-        if (clientDisconnected.get()) {
+        if (wasTerminated()) {
             return true;
         }
         return delegate.isDone();
@@ -164,7 +195,12 @@ public class DisconnectionAwareAsyncResponse
     @Override
     public void setTimeoutHandler(TimeoutHandler handler)
     {
-        delegate.setTimeoutHandler(handler);
+        delegate.setTimeoutHandler(asyncResponse -> {
+            if (wasTerminated()) {
+                return;
+            }
+            handler.handleTimeout(asyncResponse);
+        });
     }
 
     @Override
@@ -191,10 +227,15 @@ public class DisconnectionAwareAsyncResponse
         return delegate.register(callback, callbacks);
     }
 
+    private boolean wasTerminated()
+    {
+        return terminated.get();
+    }
+
     private static boolean wasRequestTerminated(Throwable throwable)
     {
         // Jetty's detected that client disconnected
-        return throwable instanceof IOException ioException && ioException.getMessage().contains("cancel_stream_error");
+        return throwable instanceof IOException;
     }
 
     public static AsyncResponseHandler bindDisconnectionAwareAsyncResponse(DisconnectionAwareAsyncResponse asyncResponse, ListenableFuture<?> futureResponse, Executor httpResponseExecutor)

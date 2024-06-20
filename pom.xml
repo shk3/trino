@@ -182,7 +182,7 @@
         <!-- keep dependency properties sorted -->
         <dep.accumulo-hadoop.version>2.7.7-1</dep.accumulo-hadoop.version>
         <dep.accumulo.version>3.0.0</dep.accumulo.version>
-        <dep.airlift.version>255</dep.airlift.version>
+        <dep.airlift.version>256</dep.airlift.version>
         <dep.alluxio.version>2.9.6</dep.alluxio.version>
         <dep.antlr.version>4.13.1</dep.antlr.version>
         <dep.avro.version>1.11.3</dep.avro.version>
@@ -281,6 +281,14 @@
                 <groupId>org.apache.arrow</groupId>
                 <artifactId>arrow-bom</artifactId>
                 <version>17.0.0</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-bom</artifactId>
+                <version>12.0.13-SNAPSHOT</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -2286,6 +2294,19 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <repositories>
+        <repository>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+            <id>jetty</id>
+            <url>https://wendigo-m2-repository.s3.us-west-2.amazonaws.com/starburst-support-snapshot-repo-12123</url>
+        </repository>
+    </repositories>
 
     <build>
         <pluginManagement>

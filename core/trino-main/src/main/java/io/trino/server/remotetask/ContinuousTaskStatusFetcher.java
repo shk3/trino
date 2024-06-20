@@ -171,6 +171,9 @@ class ContinuousTaskStatusFetcher
         @Override
         public void success(TaskStatus value)
         {
+            if (!running) {
+                return;
+            }
             try (SetThreadName _ = new SetThreadName("ContinuousTaskStatusFetcher-%s", taskId)) {
                 updateStats(requestStartNanos);
                 updateTaskStatus(value);
@@ -185,6 +188,9 @@ class ContinuousTaskStatusFetcher
         @Override
         public void failed(Throwable cause)
         {
+            if (!running) {
+                return;
+            }
             try (SetThreadName _ = new SetThreadName("ContinuousTaskStatusFetcher-%s", taskId)) {
                 updateStats(requestStartNanos);
                 // if task not already done, record error
