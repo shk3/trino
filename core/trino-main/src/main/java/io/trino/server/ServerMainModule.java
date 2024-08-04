@@ -208,6 +208,9 @@ public class ServerMainModule
 
         configBinder(binder).bindConfigDefaults(HttpServerConfig.class, httpServerConfig -> {
             httpServerConfig.setAdminEnabled(false);
+            httpServerConfig.setHttp2MaxConcurrentStreams(64 * 1024); // from the default 16K
+            httpServerConfig.setHttp2InitialStreamReceiveWindowSize(DataSize.of(2, MEGABYTE));
+            httpServerConfig.setHttp2InitialSessionReceiveWindowSize(DataSize.of(2, MEGABYTE));
         });
 
         binder.bind(PreparedStatementEncoder.class).in(Scopes.SINGLETON);
@@ -360,8 +363,9 @@ public class ServerMainModule
                 .withConfigDefaults(config -> {
                     config.setIdleTimeout(new Duration(30, SECONDS));
                     config.setRequestTimeout(new Duration(10, SECONDS));
-                    config.setMaxConnectionsPerServer(250);
+                    config.setMaxConnectionsPerServer(16);
                     config.setMaxContentLength(DataSize.of(32, MEGABYTE));
+                    config.setMaxRequestsQueuedPerDestination(65536);
                 }).build());
 
         configBinder(binder).bindConfig(DirectExchangeClientConfig.class);
