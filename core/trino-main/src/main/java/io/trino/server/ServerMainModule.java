@@ -211,6 +211,7 @@ public class ServerMainModule
             httpServerConfig.setHttp2MaxConcurrentStreams(64 * 1024); // from the default 16K
             httpServerConfig.setHttp2InitialStreamReceiveWindowSize(DataSize.of(2, MEGABYTE));
             httpServerConfig.setHttp2InitialSessionReceiveWindowSize(DataSize.of(2, MEGABYTE));
+            httpServerConfig.setCompressionEnabled(false);
         });
 
         binder.bind(PreparedStatementEncoder.class).in(Scopes.SINGLETON);
