@@ -364,13 +364,6 @@ public class DeltaLakeMergeSink
         try (ParquetDataSource dataSource = new TrinoParquetDataSource(inputFile, parquetReaderOptions, fileFormatDataSourceStats)) {
             ParquetMetadata parquetMetadata = MetadataReader.readFooter(dataSource, Optional.empty());
             long rowCount = parquetMetadata.getBlocks().stream().map(BlockMetadata::rowCount).mapToLong(Long::longValue).sum();
-            RoaringBitmapArray rowsRetained = new RoaringBitmapArray();
-            rowsRetained.addRange(0, rowCount - 1);
-            rowsRetained.andNot(deletedRows);
-            if (rowsRetained.isEmpty()) {
-                // No rows are retained in the file, so we don't need to write deletion vectors.
-                return onlySourceFile(path.toStringUtf8(), deletion);
-            }
             return writeDeletionVector(path.toStringUtf8(), inputFile.length(), inputFile.lastModified(), deletedRows, deletion, parquetMetadata, rowCount);
         }
         catch (IOException e) {
