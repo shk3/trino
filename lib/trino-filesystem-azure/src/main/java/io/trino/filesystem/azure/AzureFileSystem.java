@@ -22,6 +22,8 @@ import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobContainerClientBuilder;
 import com.azure.storage.blob.models.BlobItem;
 import com.azure.storage.blob.models.ListBlobsOptions;
+import com.azure.storage.blob.sas.BlobSasPermission;
+import com.azure.storage.blob.sas.BlobServiceSasSignatureValues;
 import com.azure.storage.blob.specialized.BlockBlobClient;
 import com.azure.storage.file.datalake.DataLakeDirectoryClient;
 import com.azure.storage.file.datalake.DataLakeFileClient;
@@ -35,14 +37,20 @@ import com.azure.storage.file.datalake.models.PathItem;
 import com.azure.storage.file.datalake.options.DataLakePathDeleteOptions;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.units.DataSize;
+import io.airlift.units.Duration;
 import io.trino.filesystem.FileIterator;
 import io.trino.filesystem.Location;
 import io.trino.filesystem.TrinoFileSystem;
 import io.trino.filesystem.TrinoFileSystemException;
 import io.trino.filesystem.TrinoInputFile;
 import io.trino.filesystem.TrinoOutputFile;
+import io.trino.filesystem.UriLocation;
 
 import java.io.IOException;
+import java.net.URI;
+import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -405,6 +413,32 @@ public class AzureFileSystem
 
         createDirectory(temporary);
         return Optional.of(temporary);
+    }
+
+    @Override
+    public Optional<UriLocation> preSignedUri(Location location, Duration ttl)
+            throws IOException
+    {
+        AzureLocation azureLocation = new AzureLocation(location);
+        BlobClient client = createBlobClient(azureLocation);
+        BlobSasPermission blobSasPermission = new BlobSasPermission()
+                .setReadPermission(true);
+
+        OffsetDateTime startTime = OffsetDateTime.now();
+        OffsetDateTime expiryTime = startTime.plus(ttl.toMillis(), ChronoUnit.MILLIS);
+
+        BlobServiceSasSignatureValues values = new BlobServiceSasSignatureValues(expiryTime, blobSasPermission)
+                .setStartTime(startTime)
+                .setExpiryTime(expiryTime)
+                .setPermissions(blobSasPermission);
+
+        createBlobContainerClient(azureLocation).generateSas(values);
+        try {
+            return Optional.of(new UriLocation(URI.create(client.getBlobUrl() + "?" + client.generateSas(values)), Map.of()));
+        }
+        catch (Exception e) {
+            throw new IOException("Failed to generate pre-signed URI", e);
+        }
     }
 
     private Set<Location> listGen2Directories(AzureLocation location)
