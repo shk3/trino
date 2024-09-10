@@ -15,25 +15,18 @@ package io.trino.client.spooling.encoding;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.trino.client.Column;
 import io.trino.client.QueryDataDecoder;
 import io.trino.client.spooling.DataAttributes;
 
-import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.util.List;
 
-import static io.trino.client.spooling.encoding.FixJsonDataUtils.fixData;
 import static java.util.Objects.requireNonNull;
 
 public class JsonQueryDataDecoder
         implements QueryDataDecoder
 {
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final TypeReference<List<List<Object>>> TYPE = new TypeReference<List<List<Object>>>() {};
     private final List<Column> columns;
 
     public JsonQueryDataDecoder(List<Column> columns)
@@ -44,14 +37,7 @@ public class JsonQueryDataDecoder
     @Override
     public QueryDataAccess decode(InputStream stream, DataAttributes attributes)
     {
-        return () -> {
-            try {
-                return fixData(columns, OBJECT_MAPPER.readValue(stream, TYPE));
-            }
-            catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        };
+        return new JsonQueryDataAccess(columns, stream);
     }
 
     @Override
