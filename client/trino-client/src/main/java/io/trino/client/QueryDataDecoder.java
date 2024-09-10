@@ -29,6 +29,16 @@ public interface QueryDataDecoder
         String encodingId();
     }
 
+    /**
+     * Decodes the input stream into a QueryDataAccess object.
+     * <p></p>
+     * Input stream should be closed by the decoder.
+     *
+     * @param input Input stream to decode (in memory or over the network)
+     * @param segmentAttributes Attributes of the segment
+     *
+     * @throws IOException if an I/O error occurs
+     */
     QueryDataAccess decode(InputStream input, DataAttributes segmentAttributes)
             throws IOException;
 

@@ -119,13 +119,14 @@ public class JsonQueryDataEncoder
                 }
                 generator.writeEndArray();
             }
+            // Interleaved array of key-value pairs, compact and retains key structure
             case Map<?, ?> mapValue -> {
-                generator.writeStartObject();
+                generator.writeStartArray();
                 for (Map.Entry<?, ?> entry : mapValue.entrySet()) {
-                    generator.writeFieldName(entry.getKey().toString());
+                    writeValue(mapper, generator, entry.getKey());
                     writeValue(mapper, generator, entry.getValue());
                 }
-                generator.writeEndObject();
+                generator.writeEndArray();
             }
             default -> mapper.writeValue(generator, value);
         }
