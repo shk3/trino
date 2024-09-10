@@ -11,26 +11,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.trino.client;
-
-import io.trino.client.spooling.DataAttributes;
-import io.trino.client.spooling.encoding.QueryDataAccess;
+package io.trino.client.spooling.encoding;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.List;
 
-public interface QueryDataDecoder
+public interface QueryDataAccess
 {
-    interface Factory
-    {
-        QueryDataDecoder create(List<Column> columns, DataAttributes queryAttributes);
-
-        String encodingId();
-    }
-
-    QueryDataAccess decode(InputStream input, DataAttributes segmentAttributes)
+    // Kept for backward compatibility with the way clients are using this interface
+    Iterable<List<Object>> toIterable()
             throws IOException;
-
-    String encodingId();
 }
