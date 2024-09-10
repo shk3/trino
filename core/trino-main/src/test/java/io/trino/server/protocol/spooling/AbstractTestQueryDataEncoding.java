@@ -430,7 +430,6 @@ public abstract class AbstractTestQueryDataEncoding
                                 .addField("b", null)
                                 .addField("c", null)
                                 .build()));
-
     }
 
     protected List<List<Object>> roundTrip(List<TypedColumn> columns, Page page)
