@@ -109,10 +109,10 @@ class StatementClientV1
     private final AtomicReference<State> state = new AtomicReference<>(State.RUNNING);
 
     // Encoded data
-    private final SegmentLoader segmentDownloader;
+    private final SegmentLoader segmentLoader;
     private final AtomicReference<QueryDataDecoder> decoder = new AtomicReference<>();
 
-    public StatementClientV1(Call.Factory httpCallFactory, ClientSession session, String query, Optional<Set<String>> clientCapabilities)
+    public StatementClientV1(Call.Factory httpCallFactory, Call.Factory segmentHttpCallFactory, ClientSession session, String query, Optional<Set<String>> clientCapabilities)
     {
         requireNonNull(httpCallFactory, "httpCallFactory is null");
         requireNonNull(session, "session is null");
@@ -134,7 +134,7 @@ class StatementClientV1
                 .map(Enum::name)
                 .collect(toImmutableSet())));
         this.compressionDisabled = session.isCompressionDisabled();
-        this.segmentDownloader = new SegmentLoader();
+        this.segmentLoader = new SegmentLoader(requireNonNull(segmentHttpCallFactory, "segmentHttpCallFactory is null"));
 
         Request request = buildQueryRequest(session, query, session.getEncodingId());
         // Pass empty as materializedJsonSizeLimit to always materialize the first response
@@ -274,7 +274,7 @@ class StatementClientV1
         }
 
         EncodedQueryData queryData = (EncodedQueryData) queryResults.getData();
-        return queryData.toRawData(decoder.get(), segmentDownloader);
+        return queryData.toRawData(decoder.get(), segmentLoader);
     }
 
     @Override
@@ -571,7 +571,6 @@ class StatementClientV1
             if (uri != null) {
                 httpDelete(uri);
             }
-            segmentDownloader.close();
         }
     }
 
