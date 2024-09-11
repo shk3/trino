@@ -15,6 +15,7 @@ package io.trino.spooling.filesystem;
 
 import com.google.common.hash.Hashing;
 import com.google.inject.Inject;
+import io.airlift.log.Logger;
 import io.airlift.slice.BasicSliceInput;
 import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.Slice;
@@ -24,6 +25,7 @@ import io.trino.filesystem.TrinoFileSystem;
 import io.trino.filesystem.TrinoFileSystemFactory;
 import io.trino.spi.QueryId;
 import io.trino.spi.protocol.SpooledLocation;
+import io.trino.spi.protocol.SpooledLocation.DirectLocation;
 import io.trino.spi.protocol.SpooledSegmentHandle;
 import io.trino.spi.protocol.SpoolingContext;
 import io.trino.spi.protocol.SpoolingManager;
@@ -48,11 +50,15 @@ import static io.trino.spi.protocol.SpooledLocation.coordinatorLocation;
 import static io.trino.spooling.filesystem.encryption.EncryptionUtils.decryptingInputStream;
 import static io.trino.spooling.filesystem.encryption.EncryptionUtils.encryptingOutputStream;
 import static io.trino.spooling.filesystem.encryption.EncryptionUtils.generateRandomKey;
+import static java.time.Duration.between;
 import static java.util.Objects.requireNonNull;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public class FileSystemSpoolingManager
         implements SpoolingManager
 {
+    private static final Logger log = Logger.get(FileSystemSpoolingManager.class);
+
     private static final String ENCRYPTION_KEY_HEADER_PREFIX = "X-Trino-SSE-C-";
     private static final String ENCRYPTION_KEY_HEADER = ENCRYPTION_KEY_HEADER_PREFIX + "Key";
     private static final String ENCRYPTION_KEY_CHECKSUM_HEADER = ENCRYPTION_KEY_HEADER_PREFIX + "SHA256";
@@ -93,7 +99,6 @@ public class FileSystemSpoolingManager
     public FileSystemSpooledSegmentHandle create(SpoolingContext context)
     {
         Instant expireAt = Instant.now().plusMillis(ttl.toMillis());
-
         if (encryptionEnabled) {
             return FileSystemSpooledSegmentHandle.random(random, context.queryId(), expireAt, Optional.of(generateRandomKey()));
         }
@@ -127,6 +132,23 @@ public class FileSystemSpoolingManager
             throws IOException
     {
         fileSystem.deleteFile(location((FileSystemSpooledSegmentHandle) handle));
+    }
+
+    @Override
+    public Optional<DirectLocation> directLocation(SpooledSegmentHandle handle)
+    {
+        FileSystemSpooledSegmentHandle fileHandle = (FileSystemSpooledSegmentHandle) handle;
+        try {
+            return fileSystem
+                    .preSignedUri(location(fileHandle), remainingTtl(fileHandle.expirationTime()))
+                    .map(location -> SpooledLocation.directLocation(location.uri(), headers(fileHandle)));
+        }
+        catch (IOException e) {
+            log.debug(e, "Failed to generate pre-signed URI for %s", fileHandle);
+            // Fallback to coordinator pass-through when
+            // pre-signed URI cannot be generated or isn't supported.
+            return Optional.empty();
+        }
     }
 
     @Override
@@ -215,6 +237,11 @@ public class FileSystemSpoolingManager
         checkExpiration(handle);
         return Location.of(location)
                 .appendPath(handle.storageObjectName());
+    }
+
+    private Duration remainingTtl(Instant expiresAt)
+    {
+        return new Duration(between(Instant.now(), expiresAt).toMillis(), MILLISECONDS);
     }
 
     private void checkExpiration(FileSystemSpooledSegmentHandle handle)

@@ -32,6 +32,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -108,6 +109,12 @@ public class LocalSpoolingManager
         }
 
         Files.delete(localHandle.path());
+    }
+
+    @Override
+    public Optional<SpooledLocation.DirectLocation> directLocation(SpooledSegmentHandle handle)
+    {
+        return Optional.empty();
     }
 
     @PreDestroy

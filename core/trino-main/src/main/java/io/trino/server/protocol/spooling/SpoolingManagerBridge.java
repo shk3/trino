@@ -49,6 +49,7 @@ public class SpoolingManagerBridge
     private final DataSize maximumSegmentSize;
     private final boolean inlineSegments;
     private final SecretKey secretKey;
+    private final boolean directAccessEnabled;
 
     @Inject
     public SpoolingManagerBridge(SpoolingConfig spoolingConfig, SpoolingManagerRegistry registry)
@@ -58,30 +59,27 @@ public class SpoolingManagerBridge
         this.initialSegmentSize = spoolingConfig.getInitialSegmentSize();
         this.maximumSegmentSize = spoolingConfig.getMaximumSegmentSize();
         this.inlineSegments = spoolingConfig.isInlineSegments();
+        this.directAccessEnabled = spoolingConfig.isDirectStorageAccess();
         this.secretKey = spoolingConfig.getSharedEncryptionKey()
                 .orElseThrow(() -> new IllegalArgumentException("protocol.spooling.shared-secret-key is not set"));
     }
 
-    public boolean isLoaded()
-    {
-        return registry
-                .getSpoolingManager()
-                .isPresent();
-    }
-
+    @Override
     public long maximumSegmentSize()
     {
         return maximumSegmentSize.toBytes();
     }
 
+    @Override
     public long initialSegmentSize()
     {
         return initialSegmentSize.toBytes();
     }
 
-    public boolean useInlineSegments()
+    @Override
+    public boolean allowSegmentInlining()
     {
-        return inlineSegments;
+        return inlineSegments && delegate().allowSegmentInlining();
     }
 
     @Override
@@ -95,12 +93,6 @@ public class SpoolingManagerBridge
             throws IOException
     {
         return delegate().createOutputStream(handle);
-    }
-
-    @Override
-    public Optional<DirectLocation> directLocation(SpooledSegmentHandle handle)
-    {
-        return delegate().directLocation(handle);
     }
 
     @Override
@@ -125,6 +117,17 @@ public class SpoolingManagerBridge
             case CoordinatorLocation coordinatorLocation ->
                     coordinatorLocation(toUri(secretKey, coordinatorLocation.identifier()), coordinatorLocation.headers());
         };
+    }
+
+    @Override
+    public Optional<DirectLocation> directLocation(SpooledSegmentHandle handle)
+    {
+        if (!directAccessEnabled) {
+            return Optional.empty();
+        }
+
+        return delegate()
+                .directLocation(handle);
     }
 
     @Override

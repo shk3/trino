@@ -254,7 +254,7 @@ public interface TrinoFileSystem
     default Optional<UriLocation> preSignedUri(Location location, Duration ttl)
             throws IOException
     {
-        throw new UnsupportedOperationException("Pre-signed URIs are not supported");
+        throw new UnsupportedOperationException("Pre-signed URIs are not supported by " + getClass().getSimpleName());
     }
 
     /**

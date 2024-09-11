@@ -48,4 +48,19 @@ public interface SpoolingManager
     {
         throw new UnsupportedOperationException();
     }
+
+    default boolean allowSegmentInlining()
+    {
+        return true;
+    }
+
+    default long initialSegmentSize()
+    {
+        return 4 * 1024 * 1024;
+    }
+
+    default long maximumSegmentSize()
+    {
+        return 32 * 1024 * 1024;
+    }
 }
