@@ -1048,7 +1048,7 @@ public abstract class BaseOpenSearchConnectorTest
                 "VALUES 'value1', 'value2', 'value3', 'value4'");
 
         assertThatThrownBy(() -> computeActual("SELECT a.\"b.c\" FROM nested_variants"))
-                .hasMessageContaining("Column 'a.b.c' cannot be resolved");
+                .hasMessageContaining("Field reference 'a.b.c' is invalid");
     }
 
     @Test

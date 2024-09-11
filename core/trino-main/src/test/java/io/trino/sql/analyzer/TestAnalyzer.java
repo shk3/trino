@@ -151,6 +151,7 @@ import static io.trino.spi.StandardErrorCode.INVALID_PLAN;
 import static io.trino.spi.StandardErrorCode.INVALID_PROCESSING_MODE;
 import static io.trino.spi.StandardErrorCode.INVALID_RANGE;
 import static io.trino.spi.StandardErrorCode.INVALID_RECURSIVE_REFERENCE;
+import static io.trino.spi.StandardErrorCode.INVALID_REFERENCE;
 import static io.trino.spi.StandardErrorCode.INVALID_ROW_PATTERN;
 import static io.trino.spi.StandardErrorCode.INVALID_TABLE_FUNCTION_INVOCATION;
 import static io.trino.spi.StandardErrorCode.INVALID_VIEW;
@@ -382,6 +383,14 @@ public class TestAnalyzer
         assertFails("SELECT sum(a) x FROM t1 HAVING x > 5")
                 .hasErrorCode(COLUMN_NOT_FOUND)
                 .hasMessage("line 1:32: Column 'x' cannot be resolved");
+    }
+
+    @Test
+    public void testRowReferencesUnknownField()
+    {
+        assertFails("SELECT row('a', 'b', 'c').field")
+                .hasErrorCode(INVALID_REFERENCE)
+                .hasMessage("line 1:8: Field reference 'field' is invalid");
     }
 
     @Test
