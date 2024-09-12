@@ -7165,7 +7165,7 @@ public class TestAnalyzer
     }
 
     @Test
-    public void tstJsonTableInJoin()
+    public void testJsonTableInJoin()
     {
         analyze("""
                 SELECT *
